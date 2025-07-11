@@ -1,4 +1,3 @@
-
 import { TechnicalAnalysis, CandlestickData, TradingSignal } from '../../technicalAnalysis';
 import { MarketData } from '../../types/marketData';
 import { riskManagement } from '../riskManagement';
@@ -90,7 +89,6 @@ export class AdaptiveSignalProcessor {
       positionSize: 0,
       leverage: 1,
       patterns: [],
-      indicators: {},
       tradingFees: 0,
       netProfit: 0,
       netLoss: 0

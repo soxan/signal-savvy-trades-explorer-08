@@ -1,4 +1,3 @@
-
 import { TechnicalAnalysis, CandlestickData, TradingSignal } from '../../technicalAnalysis';
 import { riskManagement } from '../riskManagement';
 
@@ -73,7 +72,6 @@ export class StandardSignalProcessor {
       positionSize: 0,
       leverage: 1,
       patterns: [],
-      indicators: {},
       tradingFees: 0,
       netProfit: 0,
       netLoss: 0
