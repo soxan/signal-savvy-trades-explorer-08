@@ -1,4 +1,3 @@
-
 import { TradingSignal, CandlestickData } from '../technicalAnalysis';
 
 export interface RiskParameters {
@@ -8,6 +7,10 @@ export interface RiskParameters {
   stopLossATRMultiplier: number;
   takeProfitATRMultiplier: number;
   positionSizeMethod: 'FIXED' | 'VOLATILITY_ADJUSTED' | 'KELLY_CRITERION';
+  // New parameters for realistic trading
+  minMarginUSD: number;
+  maxMarginUSD: number;
+  maxLeverage: number;
 }
 
 export interface EnhancedRiskMetrics {
@@ -35,7 +38,11 @@ export class RiskManagement {
     maxDrawdown: 15, // 15%
     stopLossATRMultiplier: 2.0,
     takeProfitATRMultiplier: 3.0,
-    positionSizeMethod: 'VOLATILITY_ADJUSTED'
+    positionSizeMethod: 'FIXED',
+    // Realistic trading parameters
+    minMarginUSD: 100,
+    maxMarginUSD: 500,
+    maxLeverage: 10
   };
   
   calculateEnhancedRisk(
@@ -46,16 +53,18 @@ export class RiskManagement {
   ): EnhancedRiskMetrics {
     const params = { ...this.defaultParameters, ...parameters };
     
-    console.log('🛡️ Calculating enhanced risk metrics...');
+    console.log('🛡️ Calculating realistic risk metrics...');
     
     const atr = this.calculateATR(data);
     const volatilityAdjustment = this.calculateVolatilityAdjustment(data, atr);
-    const optimalPositionSize = this.calculateOptimalPositionSize(
+    
+    // Calculate realistic position size based on fixed margin amounts
+    const optimalPositionSize = this.calculateRealisticPositionSize(
       signal, 
-      atr, 
       accountBalance, 
       params
     );
+    
     const { dynamicStopLoss, dynamicTakeProfit } = this.calculateDynamicLevels(
       signal, 
       atr, 
@@ -76,6 +85,25 @@ export class RiskManagement {
       kellyPercentage,
       drawdownProtection
     };
+  }
+  
+  private calculateRealisticPositionSize(
+    signal: TradingSignal,
+    accountBalance: number,
+    params: RiskParameters
+  ): number {
+    // Use a fixed margin amount between $100-$500
+    const targetMarginUSD = Math.min(
+      Math.max(params.minMarginUSD, accountBalance * 0.02), // At least 2% or $100
+      Math.min(params.maxMarginUSD, accountBalance * 0.05)  // At most 5% or $500
+    );
+    
+    // Calculate position size as percentage of account
+    const positionSizePercent = (targetMarginUSD / accountBalance) * 100;
+    
+    console.log(`💰 Calculated realistic position size: ${positionSizePercent.toFixed(2)}% ($${targetMarginUSD.toFixed(2)} margin)`);
+    
+    return Math.min(positionSizePercent, 5.0); // Cap at 5% maximum
   }
   
   private calculateATR(data: CandlestickData[], period: number = 14): number {
@@ -115,26 +143,8 @@ export class RiskManagement {
     accountBalance: number,
     params: RiskParameters
   ): number {
-    const riskAmount = accountBalance * (params.maxRiskPerTrade / 100);
-    const stopDistance = Math.abs(signal.entry - signal.stopLoss);
-    
-    switch (params.positionSizeMethod) {
-      case 'FIXED':
-        return params.maxRiskPerTrade;
-        
-      case 'VOLATILITY_ADJUSTED':
-        const atrStopDistance = atr * params.stopLossATRMultiplier;
-        const positionSize = riskAmount / atrStopDistance;
-        const maxSize = accountBalance * 0.2; // Max 20% of account
-        return Math.min(positionSize, maxSize) / accountBalance * 100;
-        
-      case 'KELLY_CRITERION':
-        const kelly = this.calculateKellyPercentage(signal);
-        return Math.min(kelly || params.maxRiskPerTrade, params.maxRiskPerTrade);
-        
-      default:
-        return params.maxRiskPerTrade;
-    }
+    // Always use realistic position sizing now
+    return this.calculateRealisticPositionSize(signal, accountBalance, params);
   }
   
   private calculateDynamicLevels(

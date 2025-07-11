@@ -1,28 +1,62 @@
 
-import { CandlestickData, TradingSignal, TechnicalAnalysis } from '../../technicalAnalysis';
-import { MarketData } from '@/lib/types/marketData';
+import { TechnicalAnalysis, CandlestickData, TradingSignal } from '../../technicalAnalysis';
+import { MarketData } from '../../types/marketData';
+import { riskManagement } from '../riskManagement';
 
 export class AdaptiveSignalProcessor {
   private ta = new TechnicalAnalysis();
 
   async processAdaptiveSignal(
-    candlestickData: CandlestickData[], 
-    selectedPair: string, 
+    candlestickData: CandlestickData[],
+    selectedPair: string,
     marketData: MarketData[]
   ): Promise<TradingSignal> {
-    console.log(`🚀 Processing adaptive signal for ${selectedPair}`);
+    console.log(`🧠 Processing ADAPTIVE signal for ${selectedPair}`);
+
+    // Calculate comprehensive indicators
+    const indicators = this.calculateComprehensiveIndicators(candlestickData);
     
-    if (candlestickData.length < 20) {
-      throw new Error(`Insufficient data: ${candlestickData.length} candles`);
+    // Generate enhanced signal with market context
+    const baseSignal = this.ta.generateEnhancedSignal(candlestickData, indicators, selectedPair);
+    
+    if (!baseSignal || baseSignal.type === 'NEUTRAL') {
+      return baseSignal || this.createNeutralSignal(selectedPair);
     }
 
-    // Calculate basic indicators
+    // Apply realistic risk management
+    const riskMetrics = riskManagement.calculateEnhancedRisk(baseSignal, candlestickData, 10000);
+    
+    // Create realistic signal with proper position sizing
+    const adaptiveSignal: TradingSignal = {
+      ...baseSignal,
+      positionSize: riskMetrics.optimalPositionSize, // This will be 1-5% now
+      leverage: Math.min(baseSignal.leverage || 1, 10), // Cap leverage at 10x
+      stopLoss: riskMetrics.dynamicStopLoss,
+      takeProfit: riskMetrics.dynamicTakeProfit,
+      riskReward: riskMetrics.riskRewardRatio,
+      confidence: Math.min(baseSignal.confidence * 1.1, 0.95), // Slight boost for adaptive
+      marketCondition: this.analyzeMarketCondition(marketData),
+      volatilityScore: riskMetrics.volatilityAdjustment,
+      timestamp: Date.now()
+    };
+
+    console.log(`✅ ADAPTIVE SIGNAL: ${adaptiveSignal.type} ${selectedPair}`, {
+      positionSize: `${adaptiveSignal.positionSize.toFixed(2)}%`,
+      marginRequired: `$${(10000 * adaptiveSignal.positionSize / 100).toFixed(2)}`,
+      leverage: `${adaptiveSignal.leverage}x`,
+      confidence: `${(adaptiveSignal.confidence * 100).toFixed(1)}%`
+    });
+
+    return adaptiveSignal;
+  }
+
+  private calculateComprehensiveIndicators(candlestickData: CandlestickData[]) {
     const closes = candlestickData.map(d => d.close);
     const highs = candlestickData.map(d => d.high);
     const lows = candlestickData.map(d => d.low);
     const volumes = candlestickData.map(d => d.volume);
 
-    const indicators = {
+    return {
       rsi: this.ta.calculateRSI(closes, 14),
       macd: this.ta.calculateMACD(closes),
       sma: this.ta.calculateSMA(closes, 20),
@@ -35,67 +69,34 @@ export class AdaptiveSignalProcessor {
       adx: this.ta.calculateADX(highs, lows, closes),
       cci: this.ta.calculateCCI(highs, lows, closes)
     };
-
-    // Market context analysis
-    const marketContext = this.analyzeMarketContext(marketData, selectedPair);
-    
-    // Generate signal with market adaptation
-    const baseSignal = this.ta.generateEnhancedSignal(candlestickData, indicators, selectedPair);
-    
-    if (!baseSignal) {
-      throw new Error('Failed to generate base signal');
-    }
-
-    // Adapt signal based on market context
-    const adaptedSignal = this.adaptSignalToMarket(baseSignal, marketContext, selectedPair);
-    
-    console.log(`✅ Adaptive signal generated for ${selectedPair}: ${adaptedSignal.type} (${(adaptedSignal.confidence * 100).toFixed(1)}%)`);
-    
-    return adaptedSignal;
   }
 
-  private analyzeMarketContext(marketData: MarketData[], selectedPair: string) {
-    const pair = marketData.find(m => m.symbol === selectedPair);
-    if (!pair) {
-      return { trend: 'NEUTRAL', strength: 0.5, volatility: 0.02 };
-    }
-
-    const changePercent = parseFloat(pair.changePercent24h.toString().replace('%', '')) / 100;
-    const volume = parseFloat(pair.volume24h.toString());
+  private analyzeMarketCondition(marketData: MarketData[]): string {
+    if (!marketData || marketData.length < 10) return 'UNKNOWN';
     
-    let trend = 'NEUTRAL';
-    let strength = Math.abs(changePercent);
+    const positiveCount = marketData.filter(m => (m.priceChangePercent || 0) > 0).length;
+    const ratio = positiveCount / marketData.length;
     
-    if (changePercent > 0.02) trend = 'BULLISH';
-    else if (changePercent < -0.02) trend = 'BEARISH';
-    
-    const volatility = Math.min(0.1, Math.abs(changePercent));
-    
-    return { trend, strength, volatility };
+    if (ratio > 0.6) return 'BULLISH';
+    if (ratio < 0.4) return 'BEARISH';
+    return 'NEUTRAL';
   }
 
-  private adaptSignalToMarket(
-    baseSignal: TradingSignal, 
-    marketContext: any, 
-    selectedPair: string
-  ): TradingSignal {
-    let adaptedSignal = { ...baseSignal };
-    
-    // Boost confidence in trending markets
-    if (marketContext.trend === 'BULLISH' && baseSignal.type === 'BUY') {
-      adaptedSignal.confidence = Math.min(0.95, baseSignal.confidence * 1.3);
-      adaptedSignal.patterns = [...baseSignal.patterns, 'Market Trend Alignment'];
-    } else if (marketContext.trend === 'BEARISH' && baseSignal.type === 'SELL') {
-      adaptedSignal.confidence = Math.min(0.95, baseSignal.confidence * 1.3);
-      adaptedSignal.patterns = [...baseSignal.patterns, 'Market Trend Alignment'];
-    }
-    
-    // Ensure minimum confidence for valid signals
-    if (adaptedSignal.confidence < 0.05) {
-      adaptedSignal.confidence = Math.max(0.05, adaptedSignal.confidence * 2);
-      adaptedSignal.patterns = [...adaptedSignal.patterns, 'Adaptive Boost'];
-    }
-
-    return adaptedSignal;
+  private createNeutralSignal(selectedPair: string): TradingSignal {
+    return {
+      type: 'NEUTRAL',
+      pair: selectedPair,
+      entry: 0,
+      stopLoss: 0,
+      takeProfit: 0,
+      confidence: 0,
+      riskReward: 0,
+      positionSize: 0,
+      leverage: 1,
+      patterns: [],
+      indicators: {},
+      timestamp: Date.now(),
+      marketCondition: 'NEUTRAL'
+    };
   }
 }
