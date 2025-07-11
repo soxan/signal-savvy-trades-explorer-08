@@ -34,10 +34,7 @@ export class AdaptiveSignalProcessor {
       stopLoss: riskMetrics.dynamicStopLoss,
       takeProfit: riskMetrics.dynamicTakeProfit,
       riskReward: riskMetrics.riskRewardRatio,
-      confidence: Math.min(baseSignal.confidence * 1.1, 0.95), // Slight boost for adaptive
-      marketCondition: this.analyzeMarketCondition(marketData),
-      volatilityScore: riskMetrics.volatilityAdjustment,
-      timestamp: Date.now()
+      confidence: Math.min(baseSignal.confidence * 1.1, 0.95) // Slight boost for adaptive
     };
 
     console.log(`✅ ADAPTIVE SIGNAL: ${adaptiveSignal.type} ${selectedPair}`, {
@@ -74,7 +71,7 @@ export class AdaptiveSignalProcessor {
   private analyzeMarketCondition(marketData: MarketData[]): string {
     if (!marketData || marketData.length < 10) return 'UNKNOWN';
     
-    const positiveCount = marketData.filter(m => (m.priceChangePercent || 0) > 0).length;
+    const positiveCount = marketData.filter(m => (m.changePercent24h || 0) > 0).length;
     const ratio = positiveCount / marketData.length;
     
     if (ratio > 0.6) return 'BULLISH';
@@ -85,7 +82,6 @@ export class AdaptiveSignalProcessor {
   private createNeutralSignal(selectedPair: string): TradingSignal {
     return {
       type: 'NEUTRAL',
-      pair: selectedPair,
       entry: 0,
       stopLoss: 0,
       takeProfit: 0,
@@ -95,8 +91,9 @@ export class AdaptiveSignalProcessor {
       leverage: 1,
       patterns: [],
       indicators: {},
-      timestamp: Date.now(),
-      marketCondition: 'NEUTRAL'
+      tradingFees: 0,
+      netProfit: 0,
+      netLoss: 0
     };
   }
 }

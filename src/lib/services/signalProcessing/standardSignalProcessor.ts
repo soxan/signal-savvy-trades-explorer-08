@@ -28,8 +28,7 @@ export class StandardSignalProcessor {
       leverage: Math.min(baseSignal.leverage || 1, 5), // Cap leverage at 5x for standard
       stopLoss: riskMetrics.dynamicStopLoss,
       takeProfit: riskMetrics.dynamicTakeProfit,
-      riskReward: riskMetrics.riskRewardRatio,
-      timestamp: Date.now()
+      riskReward: riskMetrics.riskRewardRatio
     };
 
     console.log(`✅ STANDARD SIGNAL: ${standardSignal.type} ${selectedPair}`, {
@@ -66,7 +65,6 @@ export class StandardSignalProcessor {
   private createNeutralSignal(selectedPair: string): TradingSignal {
     return {
       type: 'NEUTRAL',
-      pair: selectedPair,
       entry: 0,
       stopLoss: 0,
       takeProfit: 0,
@@ -76,7 +74,9 @@ export class StandardSignalProcessor {
       leverage: 1,
       patterns: [],
       indicators: {},
-      timestamp: Date.now()
+      tradingFees: 0,
+      netProfit: 0,
+      netLoss: 0
     };
   }
 }
