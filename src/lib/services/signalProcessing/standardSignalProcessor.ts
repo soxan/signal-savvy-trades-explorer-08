@@ -5,13 +5,12 @@ export class StandardSignalProcessor {
   private ta = new TechnicalAnalysis();
 
   async processStandardSignal(candlestickData: CandlestickData[], selectedPair: string): Promise<TradingSignal> {
-    console.log(`📊 Processing standard signal for ${selectedPair}`);
+    console.log(`🔄 Processing standard signal for ${selectedPair}`);
     
-    if (candlestickData.length < 15) {
+    if (candlestickData.length < 20) {
       throw new Error(`Insufficient data: ${candlestickData.length} candles`);
     }
 
-    // Calculate indicators
     const closes = candlestickData.map(d => d.close);
     const highs = candlestickData.map(d => d.high);
     const lows = candlestickData.map(d => d.low);
@@ -31,28 +30,8 @@ export class StandardSignalProcessor {
       cci: this.ta.calculateCCI(highs, lows, closes)
     };
 
-    // Generate enhanced signal
-    const signal = this.ta.generateEnhancedSignal(candlestickData, indicators, selectedPair);
+    const signal = this.ta.generateSignal(candlestickData, indicators);
     
-    if (!signal) {
-      // Create a basic fallback signal
-      const currentPrice = candlestickData[candlestickData.length - 1].close;
-      return {
-        type: 'NEUTRAL',
-        confidence: 0.05,
-        patterns: ['Standard Analysis'],
-        entry: currentPrice,
-        stopLoss: currentPrice * 0.98,
-        takeProfit: currentPrice * 1.02,
-        riskReward: 2.0,
-        leverage: 1,
-        positionSize: 1.0,
-        tradingFees: 0.1,
-        netProfit: 0,
-        netLoss: 0
-      };
-    }
-
     console.log(`✅ Standard signal generated for ${selectedPair}: ${signal.type} (${(signal.confidence * 100).toFixed(1)}%)`);
     
     return signal;

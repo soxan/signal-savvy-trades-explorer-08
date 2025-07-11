@@ -19,13 +19,22 @@ export class SignalDuplicateDetector {
       Math.abs(entry.signal.entry - signal.entry) < (signal.entry * 0.001) // 0.1% price difference
     );
     
-    if (!isDuplicate) {
-      // Add to history
-      recentHistory.push({ signal: { ...signal }, timestamp: now });
-      this.signalHistory.set(pair, recentHistory);
-    }
-    
     return isDuplicate;
+  }
+
+  recordSignal(signal: TradingSignal, pair: string): boolean {
+    if (this.isDuplicate(signal, pair)) {
+      console.log(`🔄 Duplicate signal detected for ${pair}, skipping`);
+      return false;
+    }
+
+    // Add to history
+    const now = Date.now();
+    const pairHistory = this.signalHistory.get(pair) || [];
+    pairHistory.push({ signal: { ...signal }, timestamp: now });
+    this.signalHistory.set(pair, pairHistory);
+    
+    return true;
   }
 
   clearCache() {

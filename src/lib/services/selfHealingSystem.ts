@@ -34,7 +34,7 @@ class SelfHealingSystem {
         name: 'Clear Signal Processing Cache',
         execute: async () => {
           try {
-            signalCoordinator.clearProcessingStates();
+            signalCoordinator.clearProcessingState();
             optimizedSignalProcessor.clearCache();
             console.log('🔧 Self-healing: Cleared signal processing cache');
             return true;

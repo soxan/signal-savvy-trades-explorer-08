@@ -28,7 +28,12 @@ export class AdaptiveSignalProcessor {
       sma: this.ta.calculateSMA(closes, 20),
       ema: this.ta.calculateEMA(closes, 12),
       bollingerBands: this.ta.calculateBollingerBands(closes),
-      vwap: this.ta.calculateVWAP(highs, lows, closes, volumes)
+      stochastic: this.ta.calculateStochastic(highs, lows, closes),
+      williams: this.ta.calculateWilliamsR(highs, lows, closes),
+      atr: this.ta.calculateATR(highs, lows, closes),
+      vwap: this.ta.calculateVWAP(highs, lows, closes, volumes),
+      adx: this.ta.calculateADX(highs, lows, closes),
+      cci: this.ta.calculateCCI(highs, lows, closes)
     };
 
     // Market context analysis
@@ -55,8 +60,8 @@ export class AdaptiveSignalProcessor {
       return { trend: 'NEUTRAL', strength: 0.5, volatility: 0.02 };
     }
 
-    const changePercent = parseFloat(pair.changePercent24h.replace('%', '')) / 100;
-    const volume = parseFloat(pair.volume24h);
+    const changePercent = parseFloat(pair.changePercent24h.toString().replace('%', '')) / 100;
+    const volume = parseFloat(pair.volume24h.toString());
     
     let trend = 'NEUTRAL';
     let strength = Math.abs(changePercent);
