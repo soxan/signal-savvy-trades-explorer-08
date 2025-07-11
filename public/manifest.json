@@ -1,0 +1,26 @@
+
+{
+  "name": "Algo Traders Pro",
+  "short_name": "AlgoTraders",
+  "description": "Professional cryptocurrency trading signals and market analysis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#22c55e",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "business"],
+  "icons": [
+    {
+      "src": "/lovable-uploads/7deeacba-2318-41c4-a9e4-6ae108b8a40f.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/lovable-uploads/7deeacba-2318-41c4-a9e4-6ae108b8a40f.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
