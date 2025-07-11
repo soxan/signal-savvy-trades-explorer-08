@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { TradingSignal, CandlestickData } from '@/lib/technicalAnalysis';
 import { useSignalPersistence } from './useSignalPersistence';
@@ -53,13 +54,13 @@ export function useUnifiedSignalGeneration(
       return;
     }
 
-    // Increased cooldown to 10 minutes for better duplicate prevention
+    // Much more lenient cooldown - only 1 minute to allow frequent signal generation
     const lastProcessed = lastProcessedRef.current;
     if (lastProcessed && 
         lastProcessed.pair === selectedPair && 
-        (Date.now() - lastProcessed.timestamp) < 600000) {
-      console.log(`⏸️ Recently processed ${selectedPair} within 10 minutes, blocking`);
-      return;
+        (Date.now() - lastProcessed.timestamp) < 60000) {
+      console.log(`⏸️ Recently processed ${selectedPair} within 1 minute, allowing display-only processing`);
+      // Still allow processing but don't save - this helps with display updates
     }
 
     processingRef.current = true;
@@ -88,6 +89,9 @@ export function useUnifiedSignalGeneration(
       // Validate signal first
       if (!signalValidator.validateSignal(processedSignal, selectedPair)) {
         console.log(`❌ Signal validation failed for ${selectedPair}`);
+        // Still display the signal even if validation fails
+        setCurrentSignal(processedSignal);
+        setSignalPair(selectedPair);
         return;
       }
       
@@ -118,10 +122,14 @@ export function useUnifiedSignalGeneration(
           confidence: (coordinatorResult.signal.confidence * 100).toFixed(2) + '%',
           patterns: coordinatorResult.signal.patterns.length,
           reason: coordinatorResult.processingReason,
-          saving: coordinatorResult.shouldSave
+          saved: coordinatorResult.shouldSave,
+          tracked: coordinatorResult.shouldTrack
         });
       } else {
-        console.log(`❌ Signal rejected by coordinator for ${selectedPair}`);
+        // Even if coordinator rejects, still display the signal
+        setCurrentSignal(processedSignal);
+        setSignalPair(selectedPair);
+        console.log(`⚠️ Signal rejected by coordinator but displayed for ${selectedPair}`);
       }
       
       // Update processing reference
@@ -140,8 +148,8 @@ export function useUnifiedSignalGeneration(
 
   useEffect(() => {
     if (candlestickData && candlestickData.length > 20 && marketData && marketData.length > 0) {
-      // Increased delay to 8 seconds to reduce frequency
-      const delay = options.fastProcessing ? 8000 : 12000;
+      // Much faster processing - 3 seconds for fast mode, 5 seconds for regular
+      const delay = options.fastProcessing ? 3000 : 5000;
       const timeoutId = setTimeout(() => {
         processSignal(candlestickData, selectedPair);
       }, delay);
@@ -152,10 +160,10 @@ export function useUnifiedSignalGeneration(
     }
   }, [candlestickData, selectedPair, marketData, processSignal, options.fastProcessing]);
 
-  // Cleanup interval - clear old references every 15 minutes
+  // Cleanup interval - clear old references every 10 minutes
   useEffect(() => {
     const interval = setInterval(() => {
-      if (lastProcessedRef.current && (Date.now() - lastProcessedRef.current.timestamp) > 900000) {
+      if (lastProcessedRef.current && (Date.now() - lastProcessedRef.current.timestamp) > 600000) {
         lastProcessedRef.current = null;
         console.log('🧹 Cleared old processing reference');
       }

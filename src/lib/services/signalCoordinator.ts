@@ -15,22 +15,28 @@ export class SignalCoordinator {
   async processSignal(signal: TradingSignal, pair: string): Promise<CoordinatorResult | null> {
     const now = Date.now();
     
-    // Increased cooldown to 5 minutes for the same pair to prevent rapid-fire signals
+    // Much more lenient cooldown - only 30 seconds to allow frequent updates
     const lastProcessed = this.lastProcessedSignals.get(pair);
-    if (lastProcessed && (now - lastProcessed.timestamp) < 300000) {
-      console.log(`⏸️ Recently processed ${pair} within 5 minutes, blocking duplicate`);
-      return null;
+    if (lastProcessed && (now - lastProcessed.timestamp) < 30000) {
+      console.log(`⏸️ Recently processed ${pair} within 30 seconds, allowing but not saving`);
+      // Still return the signal for display, just don't save it
+      return {
+        signal,
+        shouldSave: false,
+        shouldTrack: false,
+        processingReason: 'Recent duplicate - display only'
+      };
     }
 
-    // Enhanced signal validation with stricter criteria
+    // Very lenient signal validation
     if (!this.isValidSignal(signal, pair)) {
-      console.log(`❌ Signal failed validation for ${pair}`);
+      console.log(`❌ Signal failed basic validation for ${pair}`);
       return null;
     }
 
-    // More selective saving - only save high-confidence, non-neutral signals
-    const shouldSave = signal.type !== 'NEUTRAL' && signal.confidence > 0.08; // Increased threshold
-    const shouldTrack = signal.confidence > 0.10; // Increased threshold
+    // Much more permissive saving - save almost everything except very low confidence neutral signals
+    const shouldSave = signal.type !== 'NEUTRAL' || signal.confidence > 0.02;
+    const shouldTrack = signal.confidence > 0.03; // Very low threshold
 
     // Update tracking
     this.lastProcessedSignals.set(pair, { signal, timestamp: now });
@@ -41,18 +47,18 @@ export class SignalCoordinator {
       signal,
       shouldSave,
       shouldTrack,
-      processingReason: shouldSave ? 'High quality signal' : 'Informational signal'
+      processingReason: shouldSave ? 'Signal accepted' : 'Low confidence neutral signal'
     };
   }
 
   private isValidSignal(signal: TradingSignal, pair: string): boolean {
-    // Stricter validation
+    // Very basic validation only
     if (!signal || typeof signal.confidence !== 'number') {
       return false;
     }
 
-    // Higher confidence threshold to reduce noise
-    if (signal.confidence < 0.05) {
+    // Very low confidence threshold
+    if (signal.confidence < 0.01) {
       console.log(`⚠️ Signal confidence too low: ${(signal.confidence * 100).toFixed(2)}%`);
       return false;
     }
@@ -63,9 +69,9 @@ export class SignalCoordinator {
       return false;
     }
 
-    // Check for reasonable risk/reward ratio
-    if (signal.riskReward < 0.5) {
-      console.log(`⚠️ Poor risk/reward ratio: ${signal.riskReward.toFixed(2)} for ${pair}`);
+    // Very lenient risk/reward validation
+    if (signal.riskReward < 0.1) {
+      console.log(`⚠️ Very poor risk/reward ratio: ${signal.riskReward.toFixed(2)} for ${pair}`);
       return false;
     }
 

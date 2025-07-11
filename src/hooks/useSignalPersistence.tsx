@@ -48,7 +48,7 @@ export function useSignalPersistence() {
   }, [persistedSignals]);
 
   const saveSignal = (signal: TradingSignal, pair: string) => {
-    // Save ALL signals now, not just non-neutral ones for better analysis
+    // Save ALL signals for comprehensive analysis
     const newPersistedSignal: PersistedSignal = {
       signal,
       pair,

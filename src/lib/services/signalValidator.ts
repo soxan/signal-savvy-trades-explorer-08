@@ -9,10 +9,10 @@ export class SignalValidator {
   validateSignal(signal: TradingSignal, pair: string): boolean {
     const now = Date.now();
     
-    // Much more lenient rate limiting: max 1 signal per pair per 2 minutes
+    // Very lenient rate limiting: max 1 signal per pair per 30 seconds
     const lastValidation = this.lastValidationTime.get(pair);
-    if (lastValidation && (now - lastValidation) < 120000) {
-      console.log(`⏳ Rate limit: ${pair} validation too frequent (less than 2 minutes)`);
+    if (lastValidation && (now - lastValidation) < 30000) {
+      console.log(`⏳ Rate limit: ${pair} validation too frequent (less than 30 seconds)`);
       return false;
     }
 
@@ -23,8 +23,8 @@ export class SignalValidator {
       return false;
     }
 
-    // More lenient risk/reward validation
-    const minRiskReward = 0.1; // Much lower threshold
+    // Very lenient risk/reward validation
+    const minRiskReward = 0.05; // Extremely low threshold
     if (signal.riskReward < minRiskReward) {
       console.log(`❌ Risk/reward ratio ${signal.riskReward.toFixed(2)} below minimum ${minRiskReward} for ${pair}`);
       return false;
@@ -40,27 +40,27 @@ export class SignalValidator {
     this.lastValidationTime.set(pair, now);
     this.pairSignalCounts.set(pair, (this.pairSignalCounts.get(pair) || 0) + 1);
 
-    console.log(`✅ Lenient signal validation passed for ${pair}: ${signal.type} at ${(signal.confidence * 100).toFixed(2)}% confidence`);
+    console.log(`✅ Signal validation passed for ${pair}: ${signal.type} at ${(signal.confidence * 100).toFixed(2)}% confidence`);
     return true;
   }
 
   private getMinimumConfidence(signal: TradingSignal, pair: string): number {
-    // Much more lenient base threshold
-    let threshold = 0.02; // Reduced from 0.15
+    // Extremely lenient base threshold
+    let threshold = 0.01; // Very low base threshold
     
     // Adjust based on signal type
     if (signal.type === 'NEUTRAL') {
-      threshold = 0.01; // Very low for neutral signals
+      threshold = 0.005; // Even lower for neutral signals
     } else {
-      threshold = 0.03; // Still reasonable for actionable signals
+      threshold = 0.015; // Still very low for actionable signals
     }
     
-    // Reduce threshold if patterns are present
+    // Further reduce threshold if patterns are present
     if (signal.patterns.length >= 1) {
-      threshold *= 0.7; // More generous reduction
+      threshold *= 0.5; // Halve the requirement if patterns exist
     }
     
-    return Math.max(threshold, 0.01); // Absolute minimum of 1%
+    return Math.max(threshold, 0.005); // Absolute minimum of 0.5%
   }
 
   clearCache() {
