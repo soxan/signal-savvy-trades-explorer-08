@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { TradingSignal, CandlestickData } from '@/lib/technicalAnalysis';
 import { useSignalPersistence } from './useSignalPersistence';
@@ -54,12 +53,12 @@ export function useUnifiedSignalGeneration(
       return;
     }
 
-    // More lenient cooldown
+    // Increased cooldown to 10 minutes for better duplicate prevention
     const lastProcessed = lastProcessedRef.current;
     if (lastProcessed && 
         lastProcessed.pair === selectedPair && 
-        (Date.now() - lastProcessed.timestamp) < 2000) { // Reduced to 2 seconds
-      console.log(`⏸️ Recently processed ${selectedPair}, waiting...`);
+        (Date.now() - lastProcessed.timestamp) < 600000) {
+      console.log(`⏸️ Recently processed ${selectedPair} within 10 minutes, blocking`);
       return;
     }
 
@@ -104,6 +103,8 @@ export function useUnifiedSignalGeneration(
         if (coordinatorResult.shouldSave) {
           saveSignal(coordinatorResult.signal, selectedPair);
           console.log(`💾 Signal saved for ${selectedPair}: ${coordinatorResult.processingReason}`);
+        } else {
+          console.log(`📋 Signal displayed only for ${selectedPair}: ${coordinatorResult.processingReason}`);
         }
         
         // Track performance if recommended
@@ -131,24 +132,6 @@ export function useUnifiedSignalGeneration(
       
     } catch (error) {
       console.error('❌ Error in unified signal generation:', error);
-      
-      // Fallback signal
-      const fallbackSignal: TradingSignal = {
-        type: 'NEUTRAL',
-        confidence: 0.05,
-        patterns: ['Error Recovery'],
-        entry: candlestickData[candlestickData.length - 1].close,
-        stopLoss: candlestickData[candlestickData.length - 1].close * 0.99,
-        takeProfit: candlestickData[candlestickData.length - 1].close * 1.01,
-        riskReward: 1.0,
-        leverage: 1,
-        positionSize: 1.0,
-        tradingFees: 0.1,
-        netProfit: 0,
-        netLoss: 0
-      };
-      setCurrentSignal(fallbackSignal);
-      setSignalPair(selectedPair);
     } finally {
       processingRef.current = false;
       setIsProcessing(false);
@@ -157,7 +140,8 @@ export function useUnifiedSignalGeneration(
 
   useEffect(() => {
     if (candlestickData && candlestickData.length > 20 && marketData && marketData.length > 0) {
-      const delay = options.fastProcessing ? 2500 : 3500; // Slightly faster
+      // Increased delay to 8 seconds to reduce frequency
+      const delay = options.fastProcessing ? 8000 : 12000;
       const timeoutId = setTimeout(() => {
         processSignal(candlestickData, selectedPair);
       }, delay);
@@ -168,14 +152,14 @@ export function useUnifiedSignalGeneration(
     }
   }, [candlestickData, selectedPair, marketData, processSignal, options.fastProcessing]);
 
-  // Cleanup interval
+  // Cleanup interval - clear old references every 15 minutes
   useEffect(() => {
     const interval = setInterval(() => {
-      if (lastProcessedRef.current && (Date.now() - lastProcessedRef.current.timestamp) > 300000) { // 5 minutes
+      if (lastProcessedRef.current && (Date.now() - lastProcessedRef.current.timestamp) > 900000) {
         lastProcessedRef.current = null;
         console.log('🧹 Cleared old processing reference');
       }
-    }, 60000); // Check every minute
+    }, 300000); // Check every 5 minutes
 
     return () => clearInterval(interval);
   }, []);

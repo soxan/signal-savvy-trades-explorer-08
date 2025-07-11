@@ -8,15 +8,15 @@ export class SignalDuplicateDetector {
     const now = Date.now();
     const pairHistory = this.signalHistory.get(pair) || [];
     
-    // Clean old entries (older than 10 minutes)
-    const recentHistory = pairHistory.filter(entry => (now - entry.timestamp) < 600000);
+    // Clean old entries (increased to 30 minutes for better duplicate detection)
+    const recentHistory = pairHistory.filter(entry => (now - entry.timestamp) < 1800000);
     this.signalHistory.set(pair, recentHistory);
     
-    // Check for duplicates in recent history
+    // More aggressive duplicate detection
     const isDuplicate = recentHistory.some(entry => 
       entry.signal.type === signal.type &&
-      Math.abs(entry.signal.confidence - signal.confidence) < 0.05 &&
-      Math.abs(entry.signal.entry - signal.entry) < (signal.entry * 0.001) // 0.1% price difference
+      Math.abs(entry.signal.confidence - signal.confidence) < 0.15 && // Increased threshold
+      Math.abs(entry.signal.entry - signal.entry) < (signal.entry * 0.005) // Increased to 0.5% price difference
     );
     
     return isDuplicate;
@@ -24,7 +24,7 @@ export class SignalDuplicateDetector {
 
   recordSignal(signal: TradingSignal, pair: string): boolean {
     if (this.isDuplicate(signal, pair)) {
-      console.log(`🔄 Duplicate signal detected for ${pair}, skipping`);
+      console.log(`🔄 Duplicate signal detected for ${pair} - Type: ${signal.type}, Confidence: ${(signal.confidence * 100).toFixed(1)}%, skipping`);
       return false;
     }
 
@@ -34,6 +34,7 @@ export class SignalDuplicateDetector {
     pairHistory.push({ signal: { ...signal }, timestamp: now });
     this.signalHistory.set(pair, pairHistory);
     
+    console.log(`✅ Signal recorded for ${pair} - Type: ${signal.type}, Confidence: ${(signal.confidence * 100).toFixed(1)}%`);
     return true;
   }
 

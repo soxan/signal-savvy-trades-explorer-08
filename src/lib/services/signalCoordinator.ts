@@ -13,30 +13,24 @@ export class SignalCoordinator {
   private lastProcessedSignals = new Map<string, { signal: TradingSignal; timestamp: number }>();
 
   async processSignal(signal: TradingSignal, pair: string): Promise<CoordinatorResult | null> {
-    // Remove the restrictive processing check that was blocking signals
     const now = Date.now();
     
-    // Only block if we just processed the same pair within 30 seconds (much more lenient)
+    // Increased cooldown to 5 minutes for the same pair to prevent rapid-fire signals
     const lastProcessed = this.lastProcessedSignals.get(pair);
-    if (lastProcessed && (now - lastProcessed.timestamp) < 30000) {
-      console.log(`⏸️ Recently processed ${pair} within 30s, allowing but not saving`);
-      return {
-        signal,
-        shouldSave: false,
-        shouldTrack: false,
-        processingReason: 'Recent duplicate - display only'
-      };
+    if (lastProcessed && (now - lastProcessed.timestamp) < 300000) {
+      console.log(`⏸️ Recently processed ${pair} within 5 minutes, blocking duplicate`);
+      return null;
     }
 
-    // Enhanced signal validation with more lenient criteria
+    // Enhanced signal validation with stricter criteria
     if (!this.isValidSignal(signal, pair)) {
       console.log(`❌ Signal failed validation for ${pair}`);
       return null;
     }
 
-    // Always save valid signals that aren't NEUTRAL
-    const shouldSave = signal.type !== 'NEUTRAL' && signal.confidence > 0.03;
-    const shouldTrack = signal.confidence > 0.05;
+    // More selective saving - only save high-confidence, non-neutral signals
+    const shouldSave = signal.type !== 'NEUTRAL' && signal.confidence > 0.08; // Increased threshold
+    const shouldTrack = signal.confidence > 0.10; // Increased threshold
 
     // Update tracking
     this.lastProcessedSignals.set(pair, { signal, timestamp: now });
@@ -52,13 +46,13 @@ export class SignalCoordinator {
   }
 
   private isValidSignal(signal: TradingSignal, pair: string): boolean {
-    // Much more lenient validation
+    // Stricter validation
     if (!signal || typeof signal.confidence !== 'number') {
       return false;
     }
 
-    // Very low confidence threshold to allow more signals through
-    if (signal.confidence < 0.01) {
+    // Higher confidence threshold to reduce noise
+    if (signal.confidence < 0.05) {
       console.log(`⚠️ Signal confidence too low: ${(signal.confidence * 100).toFixed(2)}%`);
       return false;
     }
@@ -66,6 +60,12 @@ export class SignalCoordinator {
     // Basic price validation
     if (signal.entry <= 0) {
       console.log(`⚠️ Invalid entry price for ${pair}`);
+      return false;
+    }
+
+    // Check for reasonable risk/reward ratio
+    if (signal.riskReward < 0.5) {
+      console.log(`⚠️ Poor risk/reward ratio: ${signal.riskReward.toFixed(2)} for ${pair}`);
       return false;
     }
 
