@@ -6,6 +6,7 @@ import { useSignalPerformanceTracking } from './useSignalPerformanceTracking';
 import { SignalProcessor } from '@/lib/services/signalProcessor';
 import { systemHealthMonitor } from '@/lib/services/systemHealthMonitor';
 import { signalCoordinator } from '@/lib/services/signalCoordinator';
+import { signalValidator } from '@/lib/services/signalValidator';
 import { MarketData } from '@/lib/types/marketData';
 
 interface UnifiedSignalOptions {
@@ -49,15 +50,16 @@ export function useUnifiedSignalGeneration(
 
   const processSignal = useCallback(async (candlestickData: CandlestickData[], selectedPair: string) => {
     if (processingRef.current) {
-      console.log('⏳ Signal processing in progress, allowing concurrent processing for market adaptiveness...');
+      console.log('⏳ Signal processing in progress, skipping...');
+      return;
     }
 
-    // Market-adaptive cooldown
+    // More lenient cooldown
     const lastProcessed = lastProcessedRef.current;
     if (lastProcessed && 
         lastProcessed.pair === selectedPair && 
-        (Date.now() - lastProcessed.timestamp) < 3000) { // 3 second cooldown for stability
-      console.log(`⏸️ Recently processed ${selectedPair}, waiting for market-adaptive timing...`);
+        (Date.now() - lastProcessed.timestamp) < 2000) { // Reduced to 2 seconds
+      console.log(`⏸️ Recently processed ${selectedPair}, waiting...`);
       return;
     }
 
@@ -65,19 +67,17 @@ export function useUnifiedSignalGeneration(
     setIsProcessing(true);
     
     try {
-      console.log(`🚀 Processing MARKET-ADAPTIVE ${options.enhanced ? 'ENHANCED' : 'STANDARD'} signal for ${selectedPair}`);
+      console.log(`🚀 Processing UNIFIED signal for ${selectedPair}`);
       
       let processedSignal: TradingSignal;
       
       if (options.marketAdaptive && options.enhanced) {
-        // Use new adaptive signal processing
         processedSignal = await signalProcessor.processAdaptiveSignal(
           candlestickData,
           selectedPair,
           marketData
         );
       } else {
-        // Fallback to standard processing
         processedSignal = await signalProcessor.processStandardSignal(candlestickData, selectedPair);
       }
       
@@ -86,7 +86,13 @@ export function useUnifiedSignalGeneration(
         return;
       }
       
-      // Use signal coordinator for validation and processing
+      // Validate signal first
+      if (!signalValidator.validateSignal(processedSignal, selectedPair)) {
+        console.log(`❌ Signal validation failed for ${selectedPair}`);
+        return;
+      }
+      
+      // Process through coordinator
       const coordinatorResult = await signalCoordinator.processSignal(processedSignal, selectedPair);
       
       if (coordinatorResult) {
@@ -94,24 +100,24 @@ export function useUnifiedSignalGeneration(
         setCurrentSignal(coordinatorResult.signal);
         setSignalPair(selectedPair);
         
-        // Save signal based on coordinator recommendation
+        // Save signal if recommended
         if (coordinatorResult.shouldSave) {
           saveSignal(coordinatorResult.signal, selectedPair);
-          console.log(`💾 Signal saved for ${selectedPair} (${coordinatorResult.processingReason})`);
+          console.log(`💾 Signal saved for ${selectedPair}: ${coordinatorResult.processingReason}`);
         }
         
         // Track performance if recommended
         if (coordinatorResult.shouldTrack && options.performanceTracking) {
           trackSignalPerformance(coordinatorResult.signal, selectedPair);
-          console.log(`📊 Signal tracked for performance analysis: ${selectedPair}`);
+          console.log(`📊 Signal tracked for performance: ${selectedPair}`);
         }
         
-        console.log(`✅ MARKET-ADAPTIVE SIGNAL COMPLETE for ${selectedPair}:`, {
+        console.log(`✅ UNIFIED SIGNAL COMPLETE for ${selectedPair}:`, {
           type: coordinatorResult.signal.type,
           confidence: (coordinatorResult.signal.confidence * 100).toFixed(2) + '%',
-          marketTrend: (coordinatorResult.signal as any).marketTrend || 'N/A',
-          trendStrength: ((coordinatorResult.signal as any).trendStrength || 0).toFixed(1) + '%',
-          reason: coordinatorResult.processingReason
+          patterns: coordinatorResult.signal.patterns.length,
+          reason: coordinatorResult.processingReason,
+          saving: coordinatorResult.shouldSave
         });
       } else {
         console.log(`❌ Signal rejected by coordinator for ${selectedPair}`);
@@ -124,22 +130,22 @@ export function useUnifiedSignalGeneration(
       };
       
     } catch (error) {
-      console.error('❌ Error in market-adaptive signal generation:', error);
+      console.error('❌ Error in unified signal generation:', error);
       
-      // Enhanced fallback with market context
+      // Fallback signal
       const fallbackSignal: TradingSignal = {
         type: 'NEUTRAL',
-        confidence: 0.2,
+        confidence: 0.05,
         patterns: ['Error Recovery'],
         entry: candlestickData[candlestickData.length - 1].close,
         stopLoss: candlestickData[candlestickData.length - 1].close * 0.99,
         takeProfit: candlestickData[candlestickData.length - 1].close * 1.01,
         riskReward: 1.0,
-        leverage: 10,
+        leverage: 1,
         positionSize: 1.0,
-        tradingFees: 10,
-        netProfit: 100,
-        netLoss: 100
+        tradingFees: 0.1,
+        netProfit: 0,
+        netLoss: 0
       };
       setCurrentSignal(fallbackSignal);
       setSignalPair(selectedPair);
@@ -150,9 +156,8 @@ export function useUnifiedSignalGeneration(
   }, [signalProcessor, saveSignal, trackSignalPerformance, options, marketData]);
 
   useEffect(() => {
-    // Fixed: Add proper undefined checks before accessing .length
-    if (candlestickData && candlestickData.length > 25 && marketData && marketData.length > 0) {
-      const delay = options.fastProcessing ? 1500 : 2500; // Slightly slower for stability
+    if (candlestickData && candlestickData.length > 20 && marketData && marketData.length > 0) {
+      const delay = options.fastProcessing ? 2500 : 3500; // Slightly faster
       const timeoutId = setTimeout(() => {
         processSignal(candlestickData, selectedPair);
       }, delay);
@@ -163,21 +168,14 @@ export function useUnifiedSignalGeneration(
     }
   }, [candlestickData, selectedPair, marketData, processSignal, options.fastProcessing]);
 
-  // Enhanced cleanup and monitoring
+  // Cleanup interval
   useEffect(() => {
     const interval = setInterval(() => {
-      // Clear old processing references
-      if (lastProcessedRef.current && (Date.now() - lastProcessedRef.current.timestamp) > 120000) { // 2 minutes
+      if (lastProcessedRef.current && (Date.now() - lastProcessedRef.current.timestamp) > 300000) { // 5 minutes
         lastProcessedRef.current = null;
-        console.log('🧹 Cleared old processing reference for market adaptiveness');
+        console.log('🧹 Cleared old processing reference');
       }
-      
-      // System health monitoring
-      const health = systemHealthMonitor.getOverallHealth();
-      if (health.overall === 'CRITICAL') {
-        console.log('🚨 System health critical - maintaining market-adaptive processing');
-      }
-    }, 15000); // Check every 15 seconds
+    }, 60000); // Check every minute
 
     return () => clearInterval(interval);
   }, []);
